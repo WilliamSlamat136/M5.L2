@@ -23,7 +23,7 @@ async def help_me(ctx: commands.Context):
         "**Daftar Perintah:**\n"
         "`!start` → Mulai bot\n"
         "`!remember_city <city>` → Simpan kota\n"
-        "`!show_city <city>` → Tampilkan kota di peta\n"
+        "`!show_city <color> <city>` → Tampilkan kota di peta\n"
         "`!show_my_cities` → Tampilkan semua kota yang kamu simpan"
     )
 
@@ -51,13 +51,13 @@ async def remember_city(ctx: commands.Context, *, city_name=""):
         )
 
 @bot.command()
-async def show_city(ctx: commands.Context, *, city_name=""):
+async def show_city(ctx: commands.Context, color="red", *, city_name=""):
     if not city_name:
-        await ctx.send("Masukkan nama kota.")
+        await ctx.send("Gunakan: `!show_city <warna> <nama_kota>`")
         return
 
     path = "city.png"
-    manager.create_graph(path, [city_name])
+    manager.create_graph(path, [city_name], marker_color=color)
     await ctx.send(file=discord.File(path))
 
 

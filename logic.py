@@ -4,6 +4,8 @@ import matplotlib
 matplotlib.use('Agg')  # Menginstal backend Matplotlib untuk menyimpan file dalam memori tanpa menampilkan jendela
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs  # Mengimpor modul yang akan memungkinkan kita bekerja dengan proyeksi peta
+import cartopy.feature as cfeature
+
 
 class DB_Map():
     def __init__(self, database):
@@ -59,61 +61,90 @@ class DB_Map():
             coordinates = cursor.fetchone()
             return coordinates  # Mengembalikan koordinat kota
 
-    def create_graph(self, path, cities):
+    def create_graph(self, path, cities, marker_color="red"):
         """
-        Membuat peta dunia dan menandai kota-kota yang diberikan
+        Membuat peta dunia dengan:
+        - Benua & lautan berwarna
+        - Objek geografis
+        - Marker kota dengan warna pilihan user
         """
-        fig = plt.figure(figsize=(10, 5))
+
+        fig = plt.figure(figsize=(12, 6))
         ax = plt.axes(projection=ccrs.PlateCarree())
-        ax.stock_img()
-        ax.coastlines()
+
+        # 🌊 Lautan
+        ax.add_feature(cfeature.OCEAN, facecolor="#AADAFF")
+
+        # 🌍 Daratan / benua
+        ax.add_feature(cfeature.LAND, facecolor="#E6E6C3")
+
+        # 🗺️ Objek geografis
+        ax.add_feature(cfeature.BORDERS, linestyle=':')
+        ax.add_feature(cfeature.COASTLINE)
+        ax.add_feature(cfeature.LAKES, alpha=0.5)
+        ax.add_feature(cfeature.RIVERS)
 
         for city in cities:
             coords = self.get_coordinates(city)
             if coords:
                 lat, lng = coords
-                ax.plot(lng, lat, marker='o', color='red', markersize=6,
-                        transform=ccrs.PlateCarree())
-                ax.text(lng + 1, lat + 1, city, fontsize=9,
-                        transform=ccrs.PlateCarree())
+                ax.plot(
+                    lng, lat,
+                    marker='o',
+                    color=marker_color,
+                    markersize=8,
+                    transform=ccrs.PlateCarree()
+                )
+                ax.text(
+                    lng + 0.8, lat + 0.8,
+                    city,
+                    fontsize=9,
+                    transform=ccrs.PlateCarree()
+                )
 
-        plt.savefig(path, bbox_inches='tight')
+        plt.savefig(path, bbox_inches="tight")
         plt.close()
 
+def draw_distance(self, city1, city2, line_color="blue"):
+    coords1 = self.get_coordinates(city1)
+    coords2 = self.get_coordinates(city2)
 
-    def draw_distance(self, city1, city2):
-        """
-        Menggambar garis jarak antara dua kota
-        """
-        coords1 = self.get_coordinates(city1)
-        coords2 = self.get_coordinates(city2)
+    if not coords1 or not coords2:
+        return None
 
-        if not coords1 or not coords2:
-            return None
+    lat1, lng1 = coords1
+    lat2, lng2 = coords2
 
-        lat1, lng1 = coords1
-        lat2, lng2 = coords2
+    fig = plt.figure(figsize=(12, 6))
+    ax = plt.axes(projection=ccrs.PlateCarree())
 
-        fig = plt.figure(figsize=(10, 5))
-        ax = plt.axes(projection=ccrs.PlateCarree())
-        ax.stock_img()
-        ax.coastlines()
+    ax.add_feature(cfeature.OCEAN, facecolor="#AADAFF")
+    ax.add_feature(cfeature.LAND, facecolor="#E6E6C3")
+    ax.add_feature(cfeature.BORDERS, linestyle=':')
+    ax.add_feature(cfeature.COASTLINE)
 
-        ax.plot([lng1, lng2], [lat1, lat2],
-                color='blue', linewidth=2,
-                transform=ccrs.PlateCarree())
+    # ✈️ Garis jarak
+    ax.plot(
+        [lng1, lng2], [lat1, lat2],
+        color=line_color,
+        linewidth=2,
+        transform=ccrs.PlateCarree()
+    )
 
-        ax.scatter([lng1, lng2], [lat1, lat2],
-                color='red', transform=ccrs.PlateCarree())
+    ax.scatter(
+        [lng1, lng2], [lat1, lat2],
+        color="red",
+        transform=ccrs.PlateCarree()
+    )
 
-        ax.text(lng1, lat1, city1, transform=ccrs.PlateCarree())
-        ax.text(lng2, lat2, city2, transform=ccrs.PlateCarree())
+    ax.text(lng1, lat1, city1, transform=ccrs.PlateCarree())
+    ax.text(lng2, lat2, city2, transform=ccrs.PlateCarree())
 
-        path = "distance.png"
-        plt.savefig(path, bbox_inches='tight')
-        plt.close()
+    path = "distance.png"
+    plt.savefig(path, bbox_inches="tight")
+    plt.close()
 
-        return path
+    return path
 
 if __name__ == "__main__":
     m = DB_Map("database.db")  # Membuat objek yang akan berinteraksi dengan database
