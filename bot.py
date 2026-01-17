@@ -27,6 +27,28 @@ async def help_me(ctx: commands.Context):
         "`!show_my_cities` → Tampilkan semua kota yang kamu simpan"
     )
 
+@bot.command()
+async def remember_city(ctx: commands.Context, *, city_name=""):
+    if not city_name:
+        await ctx.send(
+            "❌ Format salah.\n"
+            "Gunakan: `!remember_city <nama_kota>`\n"
+            "Contoh: `!remember_city Jakarta`"
+        )
+        return
+
+    result = manager.add_city(ctx.author.id, city_name)
+
+    if result == 1:
+        await ctx.send(f"✅ Kota **{city_name}** berhasil disimpan!")
+    else:
+        await ctx.send(
+            "❌ Kota tidak ditemukan.\n"
+            "Pastikan:\n"
+            "- Nama kota dalam **bahasa Inggris**\n"
+            "- Ejaan benar\n"
+            "Contoh: `London`, `Tokyo`, `New York`"
+        )
 
 @bot.command()
 async def show_city(ctx: commands.Context, *, city_name=""):
