@@ -5,6 +5,42 @@ matplotlib.use('Agg')  # Menginstal backend Matplotlib untuk menyimpan file dala
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs  # Mengimpor modul yang akan memungkinkan kita bekerja dengan proyeksi peta
 import cartopy.feature as cfeature
+import requests
+from datetime import datetime, timedelta
+import pytz
+from config import WEATHER_API_KEY
+
+
+def get_time(self, city):
+    conn = sqlite3.connect(self.database)
+    with conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT timezone FROM cities WHERE city = ?",
+            (city,)
+        )
+        result = cursor.fetchone()
+
+    if not result:
+        return None
+
+    tz = pytz.timezone(result[0])
+    return datetime.now(tz).strftime("%H:%M:%S")
+
+
+def get_weather(self, city):
+    url = (
+        f"https://api.openweathermap.org/data/2.5/weather"
+        f"?q={city}&appid={WEATHER_API_KEY}&units=metric"
+    )
+    r = requests.get(url).json()
+
+    if r.get("main"):
+        return {
+            "temp": r["main"]["temp"],
+            "desc": r["weather"][0]["description"]
+        }
+    return None
 
 
 class DB_Map():
@@ -105,47 +141,122 @@ class DB_Map():
         plt.savefig(path, bbox_inches="tight")
         plt.close()
 
-def draw_distance(self, city1, city2, line_color="blue"):
-    coords1 = self.get_coordinates(city1)
-    coords2 = self.get_coordinates(city2)
+    def get_cities_by_country(self, country):
+        conn = sqlite3.connect(self.database)
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT city FROM cities WHERE country = ?",
+                (country,)
+            )
+            return [row[0] for row in cursor.fetchall()]
 
-    if not coords1 or not coords2:
-        return None
+    def get_cities_by_population(self, min_population):
+        conn = sqlite3.connect(self.database)
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT city FROM cities WHERE population >= ?",
+                (min_population,)
+            )
+            return [row[0] for row in cursor.fetchall()]
 
-    lat1, lng1 = coords1
-    lat2, lng2 = coords2
+    def get_cities_by_country_and_population(self, country, min_pop):
+        conn = sqlite3.connect(self.database)
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT city FROM cities
+                WHERE country = ? AND population >= ?""",
+                (country, min_pop)
+            )
+        return [row[0] for row in cursor.fetchall()]
+    
+    def get_weather(self, city):
+        try:
+            url = (
+                "https://api.openweathermap.org/data/2.5/weather"
+                f"?q={city}&appid={WEATHER_API_KEY}&units=metric"
+            )
+            response = requests.get(url, timeout=10)
+            data = response.json()
 
-    fig = plt.figure(figsize=(12, 6))
-    ax = plt.axes(projection=ccrs.PlateCarree())
+            if response.status_code != 200:
+                return None
 
-    ax.add_feature(cfeature.OCEAN, facecolor="#AADAFF")
-    ax.add_feature(cfeature.LAND, facecolor="#E6E6C3")
-    ax.add_feature(cfeature.BORDERS, linestyle=':')
-    ax.add_feature(cfeature.COASTLINE)
+            return {
+                "temp": data["main"]["temp"],
+                "desc": data["weather"][0]["description"],
+                "humidity": data["main"]["humidity"]
+            }
 
-    # ✈️ Garis jarak
-    ax.plot(
-        [lng1, lng2], [lat1, lat2],
-        color=line_color,
-        linewidth=2,
-        transform=ccrs.PlateCarree()
-    )
+        except Exception as e:
+            print("Weather error:", e)
+            return None
 
-    ax.scatter(
-        [lng1, lng2], [lat1, lat2],
-        color="red",
-        transform=ccrs.PlateCarree()
-    )
+    def get_time(self, city):
+        try:
+            url = (
+                "https://api.openweathermap.org/data/2.5/weather"
+                f"?q={city}&appid={WEATHER_API_KEY}"
+            )
+            r = requests.get(url, timeout=10).json()
 
-    ax.text(lng1, lat1, city1, transform=ccrs.PlateCarree())
-    ax.text(lng2, lat2, city2, transform=ccrs.PlateCarree())
+            if "timezone" not in r:
+                return None
 
-    path = "distance.png"
-    plt.savefig(path, bbox_inches="tight")
-    plt.close()
+            timezone_offset = r["timezone"]  # detik dari UTC
+            utc_time = datetime.utcnow()
+            local_time = utc_time + timedelta(seconds=timezone_offset)
 
-    return path
+            return local_time.strftime("%H:%M:%S")
 
+        except Exception as e:
+            print("Time API error:", e)
+            return None
+
+    def draw_distance(self, city1, city2, line_color="blue"):
+        coords1 = self.get_coordinates(city1)
+        coords2 = self.get_coordinates(city2)
+
+        if not coords1 or not coords2:
+            return None
+
+        lat1, lng1 = coords1
+        lat2, lng2 = coords2
+
+        fig = plt.figure(figsize=(12, 6))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+
+        ax.add_feature(cfeature.OCEAN, facecolor="#AADAFF")
+        ax.add_feature(cfeature.LAND, facecolor="#E6E6C3")
+        ax.add_feature(cfeature.BORDERS, linestyle=':')
+        ax.add_feature(cfeature.COASTLINE)
+
+        # ✈️ Garis jarak
+        ax.plot(
+            [lng1, lng2], [lat1, lat2],
+            color=line_color,
+            linewidth=2,
+            transform=ccrs.PlateCarree()
+        )
+
+        ax.scatter(
+            [lng1, lng2], [lat1, lat2],
+            color="red",
+            transform=ccrs.PlateCarree()
+        )
+
+        ax.text(lng1, lat1, city1, transform=ccrs.PlateCarree())
+        ax.text(lng2, lat2, city2, transform=ccrs.PlateCarree())
+
+        path = "distance.png"
+        plt.savefig(path, bbox_inches="tight")
+        plt.close()
+
+        return path
+    
+    
 if __name__ == "__main__":
     m = DB_Map("database.db")  # Membuat objek yang akan berinteraksi dengan database
     m.create_user_table()   # Membuat tabel dengan kota pengguna, jika tidak sudah ada
